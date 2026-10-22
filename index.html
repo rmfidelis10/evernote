@@ -20,6 +20,9 @@ button,input,select{font:inherit;color:inherit}
 .it{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:10px;cursor:pointer;transition:background .15s}
 .it:hover{background:var(--ac2)}
 .it.on{background:var(--ac2);color:var(--ac);font-weight:600}
+.nr{display:flex;align-items:center;gap:2px}.nr .it{flex:1;min-width:0}
+.xb{border:0;background:none;cursor:pointer;padding:6px 8px;border-radius:8px;color:var(--mu);font-size:13px;flex:none}.xb:hover{background:var(--ac2)}
+.it span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .it span:last-child{color:var(--mu);font-size:13px}
 .sec{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mu);padding:18px 12px 6px}
 .inp{width:100%;box-sizing:border-box;border:1px solid var(--bd);background:var(--sf);border-radius:10px;padding:9px 12px;outline:none;transition:border-color .15s,box-shadow .15s}
@@ -83,7 +86,7 @@ button,input,select{font:inherit;color:inherit}
 <div class="h"><i>📝</i>Notas</div>
 <div id="nv"></div>
 <div class="sec">Novo caderno</div>
-<input id="nn" class="inp" placeholder="Nome + Enter">
+<input id="nn" class="inp" name="novo-caderno" autocomplete="off" autocapitalize="sentences" placeholder="Nome + Enter">
 <div id="st"></div><button class="gh" id="so" style="margin-top:10px">Sair</button>
 </aside>
 <section id="list">
@@ -110,12 +113,19 @@ function el(t,c,x,k){const e=document.createElement(t);if(c)e.className=c;if(x!=
 function clean(h){const t=document.createElement("template");t.innerHTML=h||"";t.content.querySelectorAll("script,iframe,object,embed,style,link").forEach(n=>n.remove());t.content.querySelectorAll("*").forEach(n=>[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||/javascript:/i.test(a.value))n.removeAttribute(a.name)}));t.content.querySelectorAll(".todo input").forEach(i=>i.setAttribute("contenteditable","false"));return t.innerHTML}
 function allNbs(){return [...new Set([...nbs,...Object.values(notes).map(n=>n.nb).filter(Boolean)])].sort((a,b)=>a.localeCompare(b))}
 function vis(){const q=F.q.toLowerCase();return Object.entries(notes).filter(([i,n])=>(F.nb===null||n.nb===F.nb)&&(!F.tg||(n.tg||[]).includes(F.tg))&&(!q||((n.t||"")+" "+(n.x||"")+" "+(n.tg||[]).join(" ")).toLowerCase().includes(q))).sort((a,b)=>b[1].u-a[1].u)}
+let delArm=false;
+function delNb(n){nbs=nbs.filter(x=>x!==n);Object.entries(notes).forEach(([id,x])=>{if(x.nb===n){x.nb="";x.u=Date.now();persist(id)}});persist("meta");F.nb=null;render()}
 function renderNav(){
   const nv=$("#nv");nv.textContent="";
   const row=(l,c,on,k)=>{const b=el("button","it"+(on?" on":""),null,k);b.append(el("span","",l),el("span","",c));return b};
   const all=Object.values(notes);
   nv.append(row("Todas as notas",all.length,F.nb===null&&!F.tg,()=>{F.nb=null;F.tg=null;go("list");render()}));
-  allNbs().forEach(n=>nv.append(row("📓 "+n,all.filter(x=>x.nb===n).length,F.nb===n,()=>{F.nb=n;F.tg=null;go("list");render()})));
+  allNbs().forEach(n=>{
+    const w=el("div","nr");
+    w.append(row("📓 "+n,all.filter(x=>x.nb===n).length,F.nb===n,()=>{F.nb=n;F.tg=null;go("list");render()}));
+    const x=el("button","xb",delArm===n?"Apagar?":"🗑",e=>{e.stopPropagation();if(delArm!==n){delArm=n;setTimeout(()=>{if(delArm===n){delArm=false;renderNav()}},3000);renderNav();return}delArm=false;delNb(n)});
+    x.title="Excluir caderno";w.append(x);nv.append(w);
+  });
   const tags=[...new Set(all.flatMap(n=>n.tg||[]))].sort();
   if(tags.length){nv.append(el("div","sec","Tags"));tags.forEach(t=>nv.append(row("# "+t,all.filter(x=>(x.tg||[]).includes(t)).length,F.tg===t,()=>{F.tg=t;F.nb=null;go("list");render()})))}
 }
