@@ -60,6 +60,9 @@ button,input,select{font:inherit;color:inherit}
 .todo{display:flex;gap:10px;align-items:baseline}
 .todo input{width:19px;height:19px;accent-color:var(--ac);flex:none;transform:translateY(3px)}
 .todo input:checked+span{text-decoration:line-through;color:var(--mu)}
+#at{padding:0 16px}#at:empty{display:none}
+.ch{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--bd);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:13px;margin:0 6px 6px 0;max-width:100%}
+.cb{border:0;background:none;cursor:pointer;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cb:hover{color:var(--ac)}
 .bk{display:none}
 #lg{display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;padding:calc(20px + env(safe-area-inset-top,0px)) 20px calc(20px + env(safe-area-inset-bottom,0px));background:radial-gradient(900px 500px at 15% 0%,var(--ac2),transparent),var(--bg)}
 #lf{width:100%;max-width:360px;box-sizing:border-box;background:var(--sf);border:1px solid var(--bd);border-radius:22px;padding:34px 26px 28px;box-shadow:var(--sh);text-align:center;display:flex;flex-direction:column;gap:14px}
@@ -87,7 +90,7 @@ button,input,select{font:inherit;color:inherit}
 <div id="nv"></div>
 <div class="sec">Novo caderno</div>
 <input id="nn" class="inp" name="novo-caderno" autocomplete="off" autocapitalize="sentences" placeholder="Nome + Enter">
-<div id="st"></div><button class="gh" id="so" style="margin-top:10px">Sair</button>
+<div id="st"></div><button class="gh" id="ex" style="margin-top:10px">Exportar tudo</button><button class="gh" id="so" style="margin-top:8px">Sair</button>
 </aside>
 <section id="list">
 <div class="bar"><button class="gh bk" id="bn" aria-label="Menu">☰</button><input id="q" class="inp" type="search" placeholder="Buscar…"><button class="pb" id="add">+ Nota</button></div>
@@ -97,11 +100,12 @@ button,input,select{font:inherit;color:inherit}
 <div class="vz"><div style="font-size:44px">📝</div>Selecione ou crie uma nota.</div>
 <div class="box">
 <div class="bar"><button class="gh bk" id="bl" aria-label="Voltar">‹</button><input id="ti" placeholder="Título"></div>
-<div class="meta"><select id="sb" class="inp"></select><input id="tg" class="inp" placeholder="tags, separadas por vírgula"><button class="gh" id="dl">Excluir</button></div>
+<div class="meta"><select id="sb" class="inp"></select><input id="tg" class="inp" placeholder="tags, separadas por vírgula"><select id="dw" class="inp" style="flex:none;min-width:0"><option value="">⬇ Baixar</option><option value="html">HTML (formatado)</option><option value="md">Markdown (.md)</option><option value="txt">Texto (.txt)</option></select><button class="gh" id="dl">Excluir</button></div>
 <div class="tb" id="tb">
 <button data-c="bold"><b>B</b></button><button data-c="italic"><i>I</i></button><button data-c="underline"><u>U</u></button>
-<button data-c="h">H</button><button data-c="insertUnorderedList">• Lista</button><button data-c="insertOrderedList">1. Lista</button><button data-c="todo">☑ Tarefa</button>
+<button data-c="h">H</button><button data-c="insertUnorderedList">• Lista</button><button data-c="insertOrderedList">1. Lista</button><button data-c="todo">☑ Tarefa</button><button type="button" id="up">📎 Anexar</button><input type="file" id="fi" multiple hidden>
 </div>
+<div id="at"></div>
 <div id="bd" contenteditable="true"></div>
 </div>
 </main>
@@ -145,7 +149,7 @@ function renderEd(){
   else if(document.activeElement!==$("#bd")&&document.activeElement!==$("#ti")){$("#ti").value=n.t||"";$("#bd").innerHTML=clean(n.h)}
   if(document.activeElement!==$("#tg"))$("#tg").value=(n.tg||[]).join(", ");
   const s=$("#sb");s.textContent="";const o=el("option","","Sem caderno");o.value="";s.append(o);
-  allNbs().forEach(x=>{const e=el("option","","📓 "+x);e.value=x;s.append(e)});s.value=n.nb||"";
+  allNbs().forEach(x=>{const e=el("option","","📓 "+x);e.value=x;s.append(e)});s.value=n.nb||"";renderAt();
 }
 function render(){renderNav();renderList();renderEd()}
 function go(v){$("#app").dataset.v=v}
@@ -165,7 +169,7 @@ $("#sb").onchange=e=>{const n=notes[cur];if(!n)return;n.nb=e.target.value;n.u=Da
 $("#nn").onkeydown=e=>{if(e.key!=="Enter")return;const v=e.target.value.trim();if(v&&!allNbs().includes(v)){nbs.push(v);persist("meta")}e.target.value="";render()};
 $("#dl").onclick=e=>{
   if(!armed){armed=true;e.target.textContent="Confirmar?";setTimeout(()=>{armed=false;e.target.textContent="Excluir"},2500);return}
-  armed=false;e.target.textContent="Excluir";const id=cur;clearTimeout(tm);delete notes[id];S.tomb[id]=Date.now();cur=null;loaded=null;persist(id);render();go("list");
+  armed=false;e.target.textContent="Excluir";const id=cur;clearTimeout(tm);((notes[id]||{}).at||[]).forEach(f=>api({action:"delfile",id:f.id}).catch(()=>{}));delete notes[id];S.tomb[id]=Date.now();cur=null;loaded=null;persist(id);render();go("list");
 };
 function caret(n){const r=document.createRange();r.selectNodeContents(n);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r)}
 function mkTodo(){const d=el("div","todo");const i=document.createElement("input");i.type="checkbox";i.setAttribute("contenteditable","false");const s=el("span","","\u200b");d.append(i,s);return d}
@@ -233,6 +237,71 @@ async function logout(){
   if(Object.keys(S.dirty).length){status("Há notas não sincronizadas. Tente de novo com internet.");return}
   localStorage.removeItem("notas-token");localStorage.removeItem(LS);
   notes={};nbs=[];S={last:0,dirty:{},tomb:{},mu:0};cur=null;loaded=null;render();go("list");showLogin();
+}
+let armF=null;
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmt=b=>b>1e6?(b/1e6).toFixed(1)+" MB":Math.max(1,Math.round(b/1e3))+" KB";
+async function api(o){const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:localStorage.getItem("notas-token"),...o})});if(r.status===401){localStorage.removeItem("notas-token");showLogin("Token inválido. Entre novamente.")}return r}
+function dl(name,blob){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
+function toMd(root){
+  const out=[];
+  const inl=n=>{if(n.nodeType===3)return n.textContent.replace(/\u200b/g,"");if(n.nodeType!==1)return"";const t=n.tagName,c=[...n.childNodes].map(inl).join("");
+    if(t==="B"||t==="STRONG")return c.trim()?"**"+c+"**":c;if(t==="I"||t==="EM")return c.trim()?"*"+c+"*":c;if(t==="BR")return"\n";if(t==="INPUT")return"";return c};
+  [...root.childNodes].forEach(n=>{
+    if(n.nodeType===3){const t=n.textContent.trim();if(t)out.push(t,"");return}
+    if(n.nodeType!==1)return;const t=n.tagName;
+    if(t==="H2")out.push("## "+inl(n),"");
+    else if(t==="UL")out.push(...[...n.children].map(li=>"- "+inl(li)),"");
+    else if(t==="OL")out.push(...[...n.children].map((li,i)=>(i+1)+". "+inl(li)),"");
+    else if(n.classList.contains("todo"))out.push("- ["+(n.querySelector("input")?.checked?"x":" ")+"] "+inl(n).trim());
+    else out.push(inl(n),"");
+  });
+  return out.join("\n").replace(/\n{3,}/g,"\n\n").trim();
+}
+$("#dw").onchange=e=>{
+  const k=e.target.value;e.target.value="";if(!k||!notes[cur])return;
+  const t=$("#ti").value||"Sem título",base=t.replace(/[\\/:*?"<>|]+/g,"").trim()||"nota",bd=$("#bd");
+  if(k==="html")dl(base+".html",new Blob(['<!DOCTYPE html><html lang="pt-BR"><meta charset="utf-8"><title>'+esc(t)+'</title><body style="font:17px/1.6 system-ui,sans-serif;max-width:720px;margin:2em auto;padding:0 1em"><h1>'+esc(t)+"</h1>"+bd.innerHTML],{type:"text/html"}));
+  else if(k==="md")dl(base+".md",new Blob(["# "+t+"\n\n"+toMd(bd)+"\n"],{type:"text/markdown"}));
+  else dl(base+".txt",new Blob([t+"\n\n"+bd.innerText],{type:"text/plain"}));
+};
+$("#ex").onclick=()=>dl("notas-backup-"+new Date().toISOString().slice(0,10)+".json",new Blob([JSON.stringify({cadernos:allNbs(),notas:notes},null,1)],{type:"application/json"}));
+function renderAt(){
+  const n=notes[cur],box=$("#at");box.textContent="";if(!n)return;
+  (n.at||[]).forEach(f=>{
+    const c=el("span","ch"),b=el("button","cb","📎 "+f.name+" · "+fmt(f.size),()=>getFile(f)),
+    x=el("button","cb",armF===f.id?"Remover?":"✕",()=>{
+      if(armF!==f.id){armF=f.id;setTimeout(()=>{if(armF===f.id){armF=null;renderAt()}},3000);renderAt();return}
+      armF=null;const m=notes[cur];if(!m)return;m.at=(m.at||[]).filter(y=>y.id!==f.id);m.u=Date.now();persist(cur);api({action:"delfile",id:f.id}).catch(()=>{});renderAt();
+    });
+    b.title="Baixar";x.title="Remover anexo";c.append(b,x);box.append(c);
+  });
+}
+const b64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(b)});
+function shrink(f){return new Promise((res,rej)=>{const i=new Image(),u=URL.createObjectURL(f);i.onload=()=>{const s=Math.min(1,1600/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=Math.round(i.width*s);c.height=Math.round(i.height*s);const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,c.width,c.height);g.drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(),"image/jpeg",.82)};i.onerror=rej;i.src=u})}
+async function addFile(f,nid){
+  try{
+    status("Enviando "+f.name+"…");
+    let blob=f,type=f.type||"application/octet-stream",name=f.name;
+    if(/^image\/(jpeg|png|webp)$/.test(type)&&f.size>300000){blob=await shrink(f);type="image/jpeg";name=name.replace(/\.\w+$/,"")+".jpg"}
+    if(blob.size>4e6){status(f.name+" passa de 4 MB e não foi enviado");return}
+    const id="f"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    const r=await api({action:"putfile",file:{id,name,type,data:await b64(blob)}});
+    if(!r.ok)throw 0;
+    const n=notes[nid];if(!n)return;
+    (n.at=n.at||[]).push({id,name,type,size:blob.size});n.u=Date.now();persist(nid);if(cur===nid)renderAt();status("Anexo enviado: "+name);
+  }catch(x){status("Falha ao enviar "+f.name)}
+}
+$("#up").onclick=()=>{if(notes[cur])$("#fi").click()};
+$("#fi").onchange=async e=>{const fs=[...e.target.files],nid=cur;e.target.value="";for(const f of fs)await addFile(f,nid)};
+async function getFile(f){
+  try{
+    status("Baixando "+f.name+"…");
+    const r=await api({action:"getfile",id:f.id});if(!r.ok)throw 0;
+    const d=await r.json();if(!d.data)throw 0;
+    const bin=atob(d.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+    dl(f.name,new Blob([u],{type:f.type}));status("Download pronto: "+f.name);
+  }catch(e){status("Não foi possível baixar "+f.name)}
 }
 function init(){
   try{const d=JSON.parse(localStorage.getItem(LS)||"{}");notes=d.notes||{};nbs=d.nbs||[];S={...S,...(d.S||{})}}catch(e){}
